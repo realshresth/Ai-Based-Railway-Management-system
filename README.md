@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Railway Reservation Management System
 
 **Tagline:** Book Your Journey. Travel With Confidence.
@@ -164,3 +165,7 @@ Every backend `.js` file passed `node --check`, and every frontend
 the environment this was built in, so please run it locally to confirm
 end-to-end behavior, and open an issue-style note back if anything
 doesn't line up — happy to fix it.
+=======
+# Ai-Based-Railway-Management-system
+AI-Based Railway Management System is a smart platform for train booking, passenger management, scheduling, and ticket cancellation. It uses AI for intelligent train recommendations, demand prediction, route suggestions, and chatbot-based passenger assistance.
+>>>>>>> 972d968218858e4d89f369eaa34ef07e6a6dd95e
