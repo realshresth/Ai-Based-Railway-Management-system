@@ -60,6 +60,12 @@ export function AuthProvider({ children }) {
     return res.data.user;
   }
 
+  function updateUser(userData, token) {
+    if (token) localStorage.setItem("rrms_token", token);
+    localStorage.setItem("rrms_user", JSON.stringify(userData));
+    setUser(userData);
+  }
+
   function logout() {
     localStorage.removeItem("rrms_token");
     localStorage.removeItem("rrms_user");
@@ -67,7 +73,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, adminLogin, adminRegister, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, adminLogin, adminRegister, register, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

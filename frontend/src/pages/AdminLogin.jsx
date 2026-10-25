@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { errMsg } from "../api/client";
 
 export default function AdminAuth() {
-  const [mode, setMode] = useState("login");
+  const location = useLocation();
+  const modeFromUrl = () => (new URLSearchParams(location.search).get("mode") === "signup" ? "signup" : "login");
+  const [mode, setMode] = useState(modeFromUrl);
+  useEffect(() => { setMode(modeFromUrl()); }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [signupForm, setSignupForm] = useState({ name: "", email: "", password: "", adminCode: "" });
   const [error, setError] = useState("");
@@ -18,7 +22,7 @@ export default function AdminAuth() {
       await adminLogin(loginForm.email, loginForm.password);
       navigate("/admin");
     } catch (err) {
-      setError(err.response?.data?.error || (err.request ? "Couldn't reach the server. Is the backend running?" : "Admin login failed."));
+      setError(errMsg(err, "Admin login failed."));
     } finally {
       setLoading(false);
     }
@@ -31,7 +35,7 @@ export default function AdminAuth() {
       await adminRegister(signupForm);
       navigate("/admin");
     } catch (err) {
-      setError(err.response?.data?.error || (err.request ? "Couldn't reach the server. Is the backend running?" : "Admin registration failed."));
+      setError(errMsg(err, "Admin registration failed."));
     } finally {
       setLoading(false);
     }

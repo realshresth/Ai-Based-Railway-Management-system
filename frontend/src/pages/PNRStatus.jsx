@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import api from "../api/client";
+import { PayStatus } from "../components/PaymentPanel";
 
 export default function PNRStatus() {
   const location = useLocation();
@@ -47,38 +48,57 @@ export default function PNRStatus() {
 
       {error && <div className="msg-error" style={{ marginTop: 16 }}>{error}</div>}
 
-      {result && (
-        <div className="ticket" style={{ marginTop: 22 }}>
-          <div className="ticket-head">
-            <div>
-              <div style={{ fontSize: 12, color: "#C9DAD3" }}>PNR NUMBER</div>
-              <div className="pnr">{result.pnr}</div>
+      {result && (() => {
+        const live = result.source === "live";
+        const badge = live
+          ? (result.chart_prepared ? "status-confirmed" : "status-waiting")
+          : result.status === "Confirmed" ? "status-confirmed"
+          : result.status === "Cancelled" ? "status-cancelled" : "status-waiting";
+        const badgeText = live ? (result.chart_prepared ? "Chart prepared" : "Chart not prepared") : result.status;
+        return (
+          <div className="ticket" style={{ marginTop: 22 }}>
+            <div className="ticket-head">
+              <div>
+                <div style={{ fontSize: 12, color: "var(--on-navy)" }}>PNR NUMBER</div>
+                <div className="pnr">{result.pnr}</div>
+              </div>
+              <span className={"status-badge " + badge}>{badgeText}</span>
             </div>
-            <span className={"status-badge " + (
-              result.status === "Confirmed" ? "status-confirmed" :
-              result.status === "Cancelled" ? "status-cancelled" : "status-waiting"
-            )}>{result.status}</span>
-          </div>
-          <div className="ticket-body">
-            <div className="ticket-grid">
-              <div className="tg-item"><span>Train</span><b>#{result.train_number} {result.train_name}</b></div>
-              <div className="tg-item"><span>Route</span><b>{result.source_name} → {result.destination_name}</b></div>
-              <div className="tg-item"><span>Journey date</span><b>{result.journey_date}</b></div>
-              <div className="tg-item"><span>Class</span><b>{result.class_code}</b></div>
+            <div className="ticket-body">
+              <div className="ticket-grid">
+                <div className="tg-item"><span>Train</span><b>#{result.train_number} {result.train_name}</b></div>
+                <div className="tg-item"><span>Route</span><b>{result.source_name} → {result.destination_name}</b></div>
+                <div className="tg-item"><span>Journey date</span><b>{result.journey_date}</b></div>
+                <div className="tg-item"><span>Class</span><b>{live ? result.journey_class : result.class_code}</b></div>
+                {!live && result.payment_status && <div className="tg-item"><span>Payment</span><PayStatus status={result.payment_status} /></div>}
+              </div>
+              {live ? (
+                <table className="data-table" style={{ width: "100%" }}>
+                  <thead><tr><th>Passenger</th><th>Booking status</th><th>Current status</th></tr></thead>
+                  <tbody>
+                    {result.passengers.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.name}</td><td>{p.booking_status}</td><td><b>{p.current_status}</b></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="data-table" style={{ width: "100%" }}>
+                  <thead><tr><th>Passenger</th><th>Age</th><th>Gender</th><th>Seat</th></tr></thead>
+                  <tbody>
+                    {result.passengers.map((p) => (
+                      <tr key={p.id}>
+                        <td>{p.name}</td><td>{p.age}</td><td>{p.gender}</td><td>{p.coach ? `${p.coach} / ${p.coach_seat}` : p.seat_number || "Waitlisted"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <table className="data-table" style={{ width: "100%" }}>
-              <thead><tr><th>Passenger</th><th>Age</th><th>Gender</th><th>Seat</th></tr></thead>
-              <tbody>
-                {result.passengers.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.name}</td><td>{p.age}</td><td>{p.gender}</td><td>{p.seat_number || "Waitlisted"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

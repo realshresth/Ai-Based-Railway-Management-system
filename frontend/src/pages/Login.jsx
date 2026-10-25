@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { errMsg } from "../api/client";
 
 export default function ClientAuth() {
   const location = useLocation();
   const [mode, setMode] = useState(location.pathname === "/register" ? "signup" : "login");
+  useEffect(() => { setMode(location.pathname === "/register" ? "signup" : "login"); }, [location.pathname]);
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [signupForm, setSignupForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [error, setError] = useState("");
@@ -17,9 +19,9 @@ export default function ClientAuth() {
     setError(""); setLoading(true);
     try {
       await login(loginForm.email, loginForm.password);
-      navigate("/");
+      navigate(location.state?.from || "/");
     } catch (err) {
-      setError(err.response?.data?.error || (err.request ? "Couldn't reach the server. Is the backend running?" : "Login failed."));
+      setError(errMsg(err, "Login failed."));
     } finally {
       setLoading(false);
     }
@@ -30,9 +32,9 @@ export default function ClientAuth() {
     setError(""); setLoading(true);
     try {
       await register(signupForm);
-      navigate("/");
+      navigate(location.state?.from || "/");
     } catch (err) {
-      setError(err.response?.data?.error || (err.request ? "Couldn't reach the server. Is the backend running?" : "Registration failed."));
+      setError(errMsg(err, "Registration failed."));
     } finally {
       setLoading(false);
     }
@@ -77,8 +79,11 @@ export default function ClientAuth() {
             <input type="email" value={signupForm.email} onChange={(e) => setSignupForm({ ...signupForm, email: e.target.value })} required />
           </div>
           <div className="form-field">
-            <label>Phone</label>
-            <input value={signupForm.phone} onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })} />
+            <label>Mobile number</label>
+            <input type="tel" inputMode="numeric" required maxLength={14} placeholder="10-digit mobile number"
+              pattern="(\+?91[\s-]?)?[6-9][0-9]{9}" title="Enter a 10-digit Indian mobile number"
+              value={signupForm.phone} onChange={(e) => setSignupForm({ ...signupForm, phone: e.target.value })} />
+            <small style={{ color: "var(--ink-soft)" }}>We text your booking confirmation and live train status (delays, arrival) to this number.</small>
           </div>
           <div className="form-field">
             <label>Password</label>

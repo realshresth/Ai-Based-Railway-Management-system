@@ -7,7 +7,7 @@ CREATE DATABASE IF NOT EXISTS railway_reservation;
 USE railway_reservation;
 
 -- ---------- Stations ----------
-CREATE TABLE stations (
+CREATE TABLE IF NOT EXISTS stations (
   id INT AUTO_INCREMENT PRIMARY KEY,
   code VARCHAR(10) UNIQUE NOT NULL,
   name VARCHAR(100) NOT NULL,
@@ -16,7 +16,7 @@ CREATE TABLE stations (
 );
 
 -- ---------- Trains ----------
-CREATE TABLE trains (
+CREATE TABLE IF NOT EXISTS trains (
   id INT AUTO_INCREMENT PRIMARY KEY,
   train_number VARCHAR(10) UNIQUE NOT NULL,
   name VARCHAR(150) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE trains (
 );
 
 -- ---------- Train routes (intermediate stops) ----------
-CREATE TABLE train_routes (
+CREATE TABLE IF NOT EXISTS train_routes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   train_id INT NOT NULL,
   station_id INT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE train_routes (
 );
 
 -- ---------- Train classes / fares ----------
-CREATE TABLE train_classes (
+CREATE TABLE IF NOT EXISTS train_classes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   train_id INT NOT NULL,
   class_code VARCHAR(5) NOT NULL,      -- SL, 3A, 2A, 1A
@@ -57,7 +57,7 @@ CREATE TABLE train_classes (
 );
 
 -- ---------- Users (passengers + admin) ----------
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) UNIQUE NOT NULL,
@@ -66,11 +66,14 @@ CREATE TABLE users (
   role ENUM('user','admin') DEFAULT 'user',
   reset_token VARCHAR(255) DEFAULT NULL,
   reset_token_expires DATETIME DEFAULT NULL,
+  gender ENUM('M','F','O') DEFAULT NULL,
+  dob DATE DEFAULT NULL,
+  address VARCHAR(255) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ---------- Saved passengers (passenger management page) ----------
-CREATE TABLE passengers (
+CREATE TABLE IF NOT EXISTS passengers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   name VARCHAR(100) NOT NULL,
@@ -81,7 +84,7 @@ CREATE TABLE passengers (
 );
 
 -- ---------- Bookings ----------
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   pnr VARCHAR(15) UNIQUE NOT NULL,
   user_id INT NOT NULL,
@@ -90,19 +93,27 @@ CREATE TABLE bookings (
   journey_date DATE NOT NULL,
   total_fare DECIMAL(10,2) NOT NULL,
   status ENUM('Confirmed','Waiting','Cancelled') DEFAULT 'Confirmed',
+  payment_method VARCHAR(10) NOT NULL DEFAULT 'offline',
+  payment_status VARCHAR(30) NOT NULL DEFAULT 'Pay at counter',
+  transaction_id VARCHAR(40) DEFAULT NULL,
+  payment_group VARCHAR(40) DEFAULT NULL,
+  auto_upgrade TINYINT(1) NOT NULL DEFAULT 0,
+  upgraded_from VARCHAR(5) DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (train_id) REFERENCES trains(id)
 );
 
 -- ---------- Passengers attached to a specific booking ----------
-CREATE TABLE booking_passengers (
+CREATE TABLE IF NOT EXISTS booking_passengers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   booking_id INT NOT NULL,
   name VARCHAR(100) NOT NULL,
   age INT NOT NULL,
   gender ENUM('M','F','O') NOT NULL,
   seat_number VARCHAR(10),
+  berth_type VARCHAR(20) DEFAULT NULL,
+  berth_pref VARCHAR(20) DEFAULT NULL,
   FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
 );
 
@@ -158,3 +169,30 @@ INSERT INTO train_classes (train_id, class_code, class_name, fare, total_seats, 
 (6,'SL','Sleeper', 480,360,255),(6,'3A','AC 3-Tier',1200,210,193),(6,'2A','AC 2-Tier',1760,120,110),(6,'1A','AC First',3040,42,42),
 (7,'SL','Sleeper', 375,336,240),(7,'3A','AC 3-Tier',938,196,182),(7,'2A','AC 2-Tier',1375,112,103),(7,'1A','AC First',2375,39,39),
 (8,'SL','Sleeper', 470,300,205),(8,'3A','AC 3-Tier',1175,175,161),(8,'2A','AC 2-Tier',1725,100,92),(8,'1A','AC First',2980,35,35);
+
+
+-- ---------- SMS log (booking confirmations + journey-day status) ----------
+CREATE TABLE IF NOT EXISTS sms_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  booking_id INT NOT NULL,
+  kind VARCHAR(20) NOT NULL,
+  phone VARCHAR(20),
+  message TEXT,
+  provider_status VARCHAR(30),
+  delay_min INT DEFAULT NULL,
+  train_state VARCHAR(20) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX (booking_id, kind)
+);
+
+-- ---------- Coaches (blocks of seats inside a class) ----------
+CREATE TABLE IF NOT EXISTS train_coaches (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  train_id INT NOT NULL,
+  class_code VARCHAR(5) NOT NULL,
+  coach_number VARCHAR(8) NOT NULL,
+  seats INT NOT NULL,
+  UNIQUE KEY uq_train_coach (train_id, coach_number),
+  FOREIGN KEY (train_id) REFERENCES trains(id) ON DELETE CASCADE
+);
+-- (initDb.js also adds booking_passengers.coach and booking_passengers.coach_seat automatically)

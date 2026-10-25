@@ -14,6 +14,8 @@ export default function Footer() {
           <div>
             <h4>Explore</h4>
             <a href="/schedule">Train Schedule</a>
+            <a href="/vacant-seats">Vacant Seats</a>
+            <a href="/train-status">Train Status</a>
             <a href="/booking">Book Tickets</a>
             <a href="/plan-travel">Plan Travel</a>
             <a href="/pnr-status">PNR Status</a>
@@ -34,7 +36,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          © {new Date().getFullYear()} RailReserve — Railway Reservation Management System. Demo data for illustration only.
+          © 2026 @RailReserve Thank You for Visiting Our Website.
         </div>
       </div>
     </footer>

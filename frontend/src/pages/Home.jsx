@@ -28,7 +28,7 @@ const WHY = [
 
 export default function Home() {
   const [stations, setStations] = useState([]);
-  const [form, setForm] = useState({ from: "", to: "", date: "", passengers: 1 });
+  const [form, setForm] = useState({ from: "", to: "", date: "" });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -62,34 +62,32 @@ export default function Home() {
       <div className="container">
         <form className="search-card" onSubmit={handleSearch}>
           <div className="search-grid">
+            <div className="swap-group">
             <div className="field">
               <label>From Station</label>
-              <select value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} required>
+              <select value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value, to: form.to === e.target.value ? "" : form.to })} required>
                 <option value="">Select origin</option>
-                {stations.map((s) => (
+                {stations.filter((s) => s.code !== form.to).map((s) => (
                   <option key={s.id} value={s.code}>{s.name} ({s.code})</option>
                 ))}
               </select>
             </div>
+            <button type="button" className="swap-btn" aria-label="Swap stations" title="Swap stations"
+              onClick={() => setForm({ ...form, from: form.to, to: form.from })}>⇄</button>
             <div className="field">
               <label>To Station</label>
-              <select value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} required>
+              <select value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value, from: form.from === e.target.value ? "" : form.from })} required>
                 <option value="">Select destination</option>
-                {stations.map((s) => (
+                {stations.filter((s) => s.code !== form.from).map((s) => (
                   <option key={s.id} value={s.code}>{s.name} ({s.code})</option>
                 ))}
               </select>
+            </div>
             </div>
             <div className="field">
               <label>Journey Date</label>
               <input type="date" min={new Date().toISOString().slice(0, 10)}
                 value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
-            </div>
-            <div className="field">
-              <label>Passengers</label>
-              <select value={form.passengers} onChange={(e) => setForm({ ...form, passengers: e.target.value })}>
-                {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
             </div>
             <button className="btn btn-primary" type="submit" style={{ height: 44 }}>Search Trains</button>
           </div>

@@ -8,10 +8,10 @@ const { verifyToken } = require("../middleware/auth");
 const router = express.Router();
 
 function signToken(user) {
+  // No expiresIn: tokens never expire. The only config needed is JWT_SECRET in .env.
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+    process.env.JWT_SECRET
   );
 }
 
@@ -20,60 +20,83 @@ function publicUser(user) {
   return safe;
 }
 
+// Turn a crash into a clear message (shown on the login page) and log the real error.
+function fail(res, label, err) {
+  console.error(`[${label}]`, err);
+  let detail = err.message;
+  if (err.code === "ECONNREFUSED") detail = "Cannot connect to MySQL - is MySQL running? (check DB_HOST/DB_PORT in backend/.env)";
+  else if (err.code === "ER_ACCESS_DENIED_ERROR") detail = "MySQL rejected the login - DB_USER/DB_PASSWORD in backend/.env is wrong";
+  else if (err.code === "ER_BAD_DB_ERROR") detail = "Database not found - restart the backend so it can create it";
+  else if (err.code === "ER_NO_SUCH_TABLE" || err.code === "ER_BAD_FIELD_ERROR") detail = "Database tables are out of date - restart the backend (it repairs them on start). " + err.message;
+  return res.status(500).json({ error: `${label}.`, detail });
+}
+
+// bcrypt.compare throws if the stored hash is missing; treat that as "wrong password".
+const passwordMatches = async (plain, hash) => (typeof hash === "string" && hash ? bcrypt.compare(plain, hash) : false);
+
+const clean = (v) => (typeof v === "string" ? v.trim() : v);
+const { normalizePhone } = require("../utils/sms");
+const cleanEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : v);
+
 // ---------- Register ----------
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const name = clean(req.body.name), email = cleanEmail(req.body.email);
+    const phone = clean(req.body.phone), password = req.body.password;
     if (!name || !email || !password) {
       return res.status(400).json({ error: "Name, email and password are required." });
     }
+    const mobile = normalizePhone(phone);
+    if (!mobile) return res.status(400).json({ error: "Enter a valid 10-digit mobile number - booking and train-status SMS are sent to it." });
     const [existing] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
     if (existing.length) return res.status(409).json({ error: "An account with this email already exists." });
 
     const hash = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
       "INSERT INTO users (name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, 'user')",
-      [name, email, phone || null, hash]
+      [name, email, mobile, hash]
     );
     const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [result.insertId]);
     const user = rows[0];
     res.status(201).json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ error: "Registration failed.", detail: err.message });
+    fail(res, "Registration failed", err);
   }
 });
 
 // ---------- Login (user or admin, same endpoint) ----------
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = cleanEmail(req.body.email), password = req.body.password;
+    if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
     if (!rows.length) return res.status(401).json({ error: "Invalid email or password." });
 
     const user = rows[0];
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = await passwordMatches(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Invalid email or password." });
 
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ error: "Login failed.", detail: err.message });
+    fail(res, "Login failed", err);
   }
 });
 
 // ---------- Admin login (rejects non-admin accounts) ----------
 router.post("/admin/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = cleanEmail(req.body.email), password = req.body.password;
+    if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
     const [rows] = await pool.query("SELECT * FROM users WHERE email = ? AND role = 'admin'", [email]);
-    if (!rows.length) return res.status(401).json({ error: "Invalid admin credentials." });
+    if (!rows.length) return res.status(401).json({ error: "Invalid admin credentials (or this account is not an admin)." });
 
     const user = rows[0];
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = await passwordMatches(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: "Invalid admin credentials." });
 
     res.json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ error: "Admin login failed.", detail: err.message });
+    fail(res, "Admin login failed", err);
   }
 });
 
@@ -82,14 +105,11 @@ router.post("/admin/login", async (req, res) => {
 // to admin. Share that code only with people who should have staff access.
 router.post("/admin/register", async (req, res) => {
   try {
-    const { name, email, password, adminCode } = req.body;
+    const name = clean(req.body.name), email = cleanEmail(req.body.email);
+    const password = req.body.password, adminCode = clean(req.body.adminCode);
     if (!name || !email || !password || !adminCode) {
       return res.status(400).json({ error: "Name, email, password and admin code are required." });
     }
-
-    console.log("Signup code received:", adminCode);
-    console.log("Expected signup code:", process.env.ADMIN_SIGNUP_CODE);
-    
     if (adminCode !== process.env.ADMIN_SIGNUP_CODE) {
       return res.status(403).json({ error: "Invalid admin signup code." });
     }
@@ -105,7 +125,7 @@ router.post("/admin/register", async (req, res) => {
     const user = rows[0];
     res.status(201).json({ token: signToken(user), user: publicUser(user) });
   } catch (err) {
-    res.status(500).json({ error: "Admin registration failed.", detail: err.message });
+    fail(res, "Admin registration failed", err);
   }
 });
 
@@ -156,6 +176,39 @@ router.get("/me", verifyToken, async (req, res) => {
   const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [req.user.id]);
   if (!rows.length) return res.status(404).json({ error: "User not found." });
   res.json(publicUser(rows[0]));
+});
+
+// ---------- Update my profile (client or admin) ----------
+router.put("/profile", verifyToken, async (req, res) => {
+  const name = clean(req.body.name);
+  const phone = clean(req.body.phone) || null;
+  const gender = ["M", "F", "O"].includes(req.body.gender) ? req.body.gender : null;
+  const dob = req.body.dob || null;
+  const address = clean(req.body.address) || null;
+  if (!name) return res.status(400).json({ error: "Name is required." });
+  const mobile = phone ? normalizePhone(phone) : null;
+  if (phone && !mobile) return res.status(400).json({ error: "Enter a valid 10-digit mobile number." });
+
+  await pool.query("UPDATE users SET name=?, phone=?, gender=?, dob=?, address=? WHERE id=?", [
+    name, mobile, gender, dob, address, req.user.id,
+  ]);
+  const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [req.user.id]);
+  res.json({ token: signToken(rows[0]), user: publicUser(rows[0]) });
+});
+
+// ---------- Change my password ----------
+router.put("/change-password", verifyToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "Enter your current password and a new one (min 6 characters)." });
+  }
+  const [rows] = await pool.query("SELECT * FROM users WHERE id = ?", [req.user.id]);
+  if (!rows.length) return res.status(404).json({ error: "User not found." });
+  if (!(await bcrypt.compare(currentPassword, rows[0].password_hash))) {
+    return res.status(400).json({ error: "Current password is incorrect." });
+  }
+  await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [await bcrypt.hash(newPassword, 10), req.user.id]);
+  res.json({ message: "Password changed." });
 });
 
 module.exports = router;

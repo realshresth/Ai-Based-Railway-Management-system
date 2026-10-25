@@ -30,10 +30,10 @@ router.get("/", async (req, res) => {
   const { from, to } = req.query;
   let sql = TRAIN_LIST_SQL;
   const params = [];
-  if (from && to) {
-    sql += " WHERE (s1.code = ? OR s1.name = ?) AND (s2.code = ? OR s2.name = ?)";
-    params.push(from, from, to, to);
-  }
+  const where = [];
+  if (from) { where.push("(s1.code = ? OR s1.name = ?)"); params.push(from, from); }
+  if (to) { where.push("(s2.code = ? OR s2.name = ?)"); params.push(to, to); }
+  if (where.length) sql += " WHERE " + where.join(" AND ");
   sql += " ORDER BY t.departure_time";
   const [trains] = await pool.query(sql, params);
   res.json(await attachClasses(trains));

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Railway Reservation Management System
 
 **Tagline:** Book Your Journey. Travel With Confidence.
@@ -34,7 +33,18 @@ railway-reservation-system/
                               # ForgotPassword, AdminDashboard
 ```
 
-## 1. Set up the database
+## Quick start (updated)
+
+1. Make sure MySQL is running. Open `backend/.env` and put your MySQL password in `DB_PASSWORD`.
+2. `cd backend && npm install && npm run dev` — on first start the server **creates the database,
+   tables, sample trains and a default admin by itself** (no manual SQL or seed step needed).
+3. `cd frontend && npm install && npm run dev`, then open http://localhost:5173.
+
+Logins: **Admin** `admin@railsarthi.in` / `admin123` at `/admin-login` (admin signup code: `admin2026`).
+**Clients** register at `/login` -> Sign Up. Both can open **Profile** from the navbar (edit details, change password).
+Check http://localhost:5000/api/health — it must say `"db":"connected"`; if not, fix `DB_USER`/`DB_PASSWORD`.
+
+## 1. Set up the database (manual option)
 
 Install MySQL 8+ locally (or use a cloud instance), then:
 
@@ -52,7 +62,7 @@ stops, and fare classes (Sleeper / 3A / 2A / 1A).
 cd backend
 npm install
 cp .env.example .env
-# edit .env: set DB_PASSWORD to your MySQL password, and set a real JWT_SECRET
+# edit .env: set DB_PASSWORD to your MySQL password, and set a real JWT_SECRET (the only auth setting; login tokens never expire) and your RAPIDAPI_KEY for live PNR status
 npm run seed:admin     # creates the admin login from ADMIN_EMAIL/ADMIN_PASSWORD in .env
 npm run dev            # starts on http://localhost:5000
 ```
@@ -98,8 +108,9 @@ frontend and backend talk to each other with no extra config. Open
   `train_classes`; booking a seat decrements availability in a DB
   transaction and issues a unique PNR; overbooking automatically produces
   a "Waiting" status instead of a seat number.
-- **PNR status**: public endpoint, no login required — matches how real
-  PNR lookup works.
+- **PNR status**: public endpoint, no login required. PNRs booked on this site
+  are answered from the database; any other 10-digit PNR is checked live via
+  RapidAPI using `RAPIDAPI_KEY` from `backend/.env`.
 - **My Bookings**: cancelling releases the seats back to the class pool;
   "download ticket" exports a real text file built from the booking data.
 - **Passenger Management**: full CRUD scoped to the logged-in user.
@@ -146,9 +157,8 @@ worth checking which one you're actually seeing:
 
 ## Known limitations / good next steps
 
-- No payment gateway is integrated — "Confirm & Pay" simulates payment
-  and books immediately. Wiring in Razorpay/Stripe would be the natural
-  next step.
+- Payments are manual: the booking page offers Online (UPI, then the user types the transaction ID; staff verify it in Admin → Bookings) or Offline (pay at the counter, staff mark it paid). The UPI ID is set in `frontend/src/config.js`. There is no automatic bank verification.
+  Wiring in Razorpay/Stripe would be the natural next step for automatic verification.
 - Forgot-password returns the token directly instead of emailing it —
   fine for local dev, not for production.
 - Admin train editing has a backend endpoint (`PUT /api/trains/:id`) but
@@ -165,7 +175,25 @@ Every backend `.js` file passed `node --check`, and every frontend
 the environment this was built in, so please run it locally to confirm
 end-to-end behavior, and open an issue-style note back if anything
 doesn't line up — happy to fix it.
-=======
-# Ai-Based-Railway-Management-system
-AI-Based Railway Management System is a smart platform for train booking, passenger management, scheduling, and ticket cancellation. It uses AI for intelligent train recommendations, demand prediction, route suggestions, and chatbot-based passenger assistance.
->>>>>>> 972d968218858e4d89f369eaa34ef07e6a6dd95e
+
+## What's new in v5
+- **PDF ticket** – "Download ticket (PDF)" in My Bookings and on the booking confirmation: passengers, seats/berths, fare billing and payment details (UPI ID, transaction ID, status).
+- **Berth preference & auto-upgrade** – pick Lower / Middle / Upper / Side Lower / Side Upper per passenger (with live vacancy counts). Tick *Auto-upgrade* and, if your class is full, you're moved to a higher class at the fare you chose.
+- **Vacant Seats** – new header link (`/vacant-seats`) showing live seats per class with a berth breakdown. Counts are per train, not per journey date.
+- **Payment** – offline option removed; payment is UPI + transaction ID, verified by admin.
+- **Home** – railway-track hero illustration with dark-blue overlay, swap (⇄) button between From/To, AI Search example chips ("Find the fastest train to Mumbai", "Show trains under ₹1,000"…).
+- New DB columns are added automatically on backend start.
+
+## v7: Where is my train + SMS
+- **Train Status** (`/train-status`): live position, delay and upcoming stations (uses RailRadar via `RAILRADAR_API_KEY`, free plan = 100 requests/month so results are cached 10 min; falls back to a timetable estimate if live data isn't available).
+- **SMS**: a confirmation is texted after every booking to the mobile number in the user's profile. On the journey date (from 6 AM IST) the train's status is texted, and again if the delay changes by 15+ minutes or the train arrives.
+- Set `SMS_PROVIDER` in `backend/.env` (`console` just prints messages; `fast2sms` or `twilio` really send them) and add that provider's key. Test with `POST /api/live/sms-test {phone}` as admin.
+
+## v11: Coaches
+- Admin Console → **Coaches**: pick a train, see each class's coaches (S1, S2… / B1… / A1… / H1…) with seat ranges and vacancy, **+ Add coach** (number + seats; the class's total seats grow), or remove the last coach if none of its seats is booked. "Save these coaches" turns the automatic layout into editable coaches.
+- Seats are allotted coach by coach, and passengers booked together are kept in one coach when possible. Berths (Lower/Middle/Upper/Side) restart in every coach.
+- Coach and seat show on the confirmation, My Bookings, the PDF ticket, PNR status, the SMS and the Vacant Seats map (grouped by coach).
+- Defaults when nothing is saved: SL 72 seats/coach (S1…), 3A 64 (B1…), 2A 48 (A1…), 1A 24 (H1…).
+
+## v15: more trains
+On the next backend start, 10 sample trains around Gorakhpur, Lucknow and Varanasi are added once (GKP⇄LKO, GKP⇄BSB, LKO⇄BSB, GKP⇄NDLS, BSB→NDLS, GKP→PNBE) with stops, classes, fares and seats. Existing stations/trains are reused. They are sample timetables - edit or delete them in the Admin Console.
